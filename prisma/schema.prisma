@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // ===== 数据库切换说明 =====
+  //
+  // 开发环境：使用 SQLite，零配置开箱即用
+  //   provider = "sqlite"
+  //   DATABASE_URL="file:./dev.db"
+  //
+  // 生产环境：切换到 PostgreSQL，需要先创建数据库
+  //   1. 注册 Neon (https://neon.tech) 免费版
+  //   2. 创建项目，获取连接字符串
+  //   3. 修改下方 provider 和 DATABASE_URL
+  //
+  //   provider = "postgresql"
+  //   DATABASE_URL="postgresql://user:password@ep-xxxx.neon.tech/fraud-cases?sslmode=require"
+  //
+  // 切换后执行: npx prisma migrate deploy
+
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    Int      @id @default(autoincrement())
+  username              String   @unique
+  email                 String   @unique
+  passwordHash          String
+  avatar                String?
+  bio                   String?
+  emailVerified         Boolean  @default(false)
+  emailVerificationToken String?
+  passwordChangedAt     DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  cases     Case[]
+  comments  Comment[]
+  bookmarks Bookmark[]
+}
+
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  cases Case[]
+}
+
+model Case {
+  id         Int      @id @default(autoincrement())
+  title      String
+  content    String
+  userId     Int
+  categoryId Int
+  viewCount  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  author   User       @relation(fields: [userId], references: [id])
+  category Category   @relation(fields: [categoryId], references: [id])
+  images   CaseImage[]
+  comments Comment[]
+
+  @@index([userId])
+  @@index([categoryId])
+  @@index([createdAt])
+}
+
+model CaseImage {
+  id        Int      @id @default(autoincrement())
+  caseId    Int?
+  url       String
+  alt       String?
+  createdAt DateTime @default(now())
+
+  case Case? @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  userId    Int
+  caseId    Int
+  parentId  Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author  User     @relation(fields: [userId], references: [id])
+  case    Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  parent  Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([caseId])
+  @@index([userId])
+  @@index([parentId])
+}
+
+model Bookmark {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  caseId    Int
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, caseId])
+  @@index([userId])
+  @@index([caseId])
+}
